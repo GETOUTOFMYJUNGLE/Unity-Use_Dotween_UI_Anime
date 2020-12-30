@@ -1,6 +1,7 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
 using DG.Tweening;
 
 //使用此腳本前請先在工作檔放入DOTween插件
@@ -30,33 +31,63 @@ public class InOut : MonoBehaviour
 
     public enum Type
     {
-        彈跳,
-        X軸彈跳,
-        Y軸彈跳,
+        文字,
+        變色,
+        縮放,
         位移,
         旋轉,
     }
     [Header("動畫模式")]
-    [Tooltip("決定這物體的緩入緩出動畫")]
+    [Tooltip("決定這物體的動畫行為")]
     public Type TheAnime;
+
+    public enum Type3
+    {
+        絕對,
+        相對,
+    }
+    [Header("起點定義")]
+    [Tooltip("決定起點設置的是絕對的還是相對的，動畫模式為文字時無效")]
+    public Type3 TheBegin;
+
+    [Header("起始大小（只有動畫模式為縮放時才有效）")]
+    [Tooltip("如果動畫模式是縮放的話，那一開始有多大")]
+    public Vector3 begin_sca;
 
     [Header("位移起點（只有動畫模式為位移時才有效）")]
     [Tooltip("如果動畫模式是位移的話，那起點在哪裡")]
-    public Vector2 begin_pos;
+    public Vector3 begin_pos;
 
     [Header("旋轉起點（只有動畫模式為旋轉時才有效）")]
-    [Range(0f, 360f)]
     [Tooltip("如果動畫模式是旋轉的話，那一開始是幾度")]
-    public float begin_rot;
+    public Vector3 begin_rot;
+
+    [Header("起始顏色（只有動畫模式為變色時才有效）")]
+    [Tooltip("如果動畫模式是變色的話，那一開始是甚麼顏色")]
+    public Color begin_col;
 
     [Header("動畫時間")]
-    [Tooltip("決定動畫完成的時間")]
-    [Range(0.1f, 7f)]
+    [Tooltip("決定循環一次的時間")]
+    [Range(0f, 60f)]
     public float time = 0.1f;
+
+    [Header("隨機改變動畫時間")]
+    [Tooltip("決定隨機改變動畫時間可能的最大值與最小值會差幾秒，容易與其他InOut或Floater衝突，請慎用")]
+    [Range(0f, 30f)]
+    public float The_rand_time = 0f;
+
+    [Header("啟用延遲時間")]
+    [Tooltip("可以讓出現的動畫延遲幾秒後再執行")]
+    [Range(0f, 60f)]
+    public float delay_time = 0f;
 
     [Header("收回後刪除嗎")]
     [Tooltip("決定收回後是刪除還是放置")]
     public bool Die = true;
+
+    [Header("停在起始嗎")]
+    [Tooltip("決定是否停在起始位置")]
+    public bool Stopin = false;
 
     [Header("預設啟用嗎")]
     [Tooltip("決定是否一開始就要播放動畫")]
@@ -64,87 +95,360 @@ public class InOut : MonoBehaviour
 
     //XXX為掛載此腳本的物件名稱
     //由別的腳本調用此物件收回的方式：GameObject.Find("XXX").GetComponent<InOut>().Back();
-
+    //由別的腳本調用此物件且不延遲收回的方式：GameObject.Find("XXX").GetComponent<InOut>().NowBack();
+    
+    string Now_tex;//目前文字
+    Color Now_col;//目前色彩
     Vector3 Now_sca;//目前大小
     Vector3 Now_pos;//目前位置
-    float Now_rot;//目前角度
+    Vector3 Now_rot;//目前角度
     bool back = false;//是要收回嗎
+    bool relatively = false;//用來讓相對模式不會重複動到起始兩次的按鈕
     void Start()
     {
         Now_sca = transform.localScale;
         Now_pos = transform.position;
-        Now_rot = transform.eulerAngles.z;
+        Now_rot = transform.eulerAngles;
+        if (GetComponent<Image>() != null)
+        {
+            Now_col = GetComponent<Image>().color;
+        }
+        else if (GetComponent<Text>() != null)
+        {
+            Now_col = GetComponent<Text>().color;
+        }
+        else if (GetComponentsInChildren<Transform>(true).Length > 1)//有子物件
+        {
+            if (transform.GetChild(0).GetComponent<Image>() != null)
+                Now_col = transform.GetChild(0).GetComponent<Image>().color;
+            else if (transform.GetChild(0).GetComponent<Text>() != null)
+                Now_col = transform.GetChild(0).GetComponent<Text>().color;
+        }
+        
+        if (GetComponent<Text>() != null)
+        {
+            Now_tex = GetComponent<Text>().text;
+        }
+        else if (GetComponentsInChildren<Transform>(true).Length > 1)//有子物件
+        {
+            if (transform.GetChild(0).GetComponent<Text>() != null)
+                Now_tex = transform.GetChild(0).GetComponent<Text>().text;
+        }
+        Run_Anime();
+    }
+    public void Run_Anime()
+    {
+        relatively = false;
         if (Startin)
-            Anime();
+        {
+            //執行動畫
+            if (delay_time > 0 && !Stopin)
+            {
+                Stopin = true;
+                Anime();
+                Stopin = false;
+                relatively = true;
+                Invoke("Anime", delay_time);
+            }
+            else if (delay_time > 0 && Stopin)
+            {
+                Invoke("Anime", delay_time);
+            }
+            else
+                Anime();
+        }
     }
     void Anime()
     {
+        float rand_time = Random.Range(The_rand_time * -1, The_rand_time);//隨機時間
+        if (rand_time + time < 0.1f)
+            rand_time = (time - 0.1f) * -1;
+
         Sequence Sequence = DOTween.Sequence();//動畫列表
         Tween[] tween = new Tween[3];
         if (!back)//淡入
         {
-            if (TheAnime == Type.彈跳)
+            if (TheAnime == Type.文字)
             {
-                transform.localScale = new Vector3();
-                tween[2] = Sequence.Insert(0.01f, transform.DOScale(Now_sca, time));
+                if (GetComponent<Text>() != null)
+                {
+                    GetComponent<Text>().text = "";
+                    if (!Stopin)
+                        tween[2] = Sequence.Insert(0.01f, GetComponent<Text>().DOText(Now_tex, time + rand_time));
+                }
+                else if (GetComponentsInChildren<Transform>(true).Length > 1)//有子物件
+                {
+                    if (transform.GetChild(0).GetComponent<Text>() != null)
+                    {
+                        transform.GetChild(0).GetComponent<Text>().text = "";
+                        if (!Stopin)
+                            tween[2] = Sequence.Insert(0.01f, transform.GetChild(0).GetComponent<Text>().DOText(Now_tex, time + rand_time));
+                    }
+                }
             }
-            if (TheAnime == Type.X軸彈跳)
+            if (TheAnime == Type.變色)
             {
-                transform.localScale = new Vector3(0, transform.localScale.y, transform.localScale.z);
-                tween[2] = Sequence.Insert(0.01f, transform.DOScale(Now_sca, time));
+                if (TheBegin == Type3.相對)
+                {
+                    if (GetComponent<Image>() != null)
+                    {
+                        if (!relatively)
+                            GetComponent<Image>().color = GetComponent<Image>().color + begin_col;
+                        if (!Stopin)
+                            tween[2] = Sequence.Insert(0.01f, GetComponent<Image>().DOColor(Now_col, time + rand_time));
+                    }
+                    else if (GetComponent<Text>() != null)
+                    {
+                        if (!relatively)
+                            GetComponent<Text>().color = GetComponent<Text>().color + begin_col;
+                        if (!Stopin)
+                            tween[2] = Sequence.Insert(0.01f, GetComponent<Text>().DOColor(Now_col, time + rand_time));
+                    }
+                    else if (GetComponentsInChildren<Transform>(true).Length > 1)//有子物件
+                    {
+                        if (transform.GetChild(0).GetComponent<Image>() != null)
+                        {
+                            if (!relatively)
+                                transform.GetChild(0).GetComponent<Image>().color = transform.GetChild(0).GetComponent<Image>().color + begin_col;
+                            if (!Stopin)
+                                tween[2] = Sequence.Insert(0.01f, transform.GetChild(0).GetComponent<Image>().DOColor(Now_col, time + rand_time));
+                        }
+                        else if (transform.GetChild(0).GetComponent<Text>() != null)
+                        {
+                            if (!relatively)
+                                transform.GetChild(0).GetComponent<Text>().color = transform.GetChild(0).GetComponent<Text>().color + begin_col;
+                            if (!Stopin)
+                                tween[2] = Sequence.Insert(0.01f, transform.GetChild(0).GetComponent<Text>().DOColor(Now_col, time + rand_time));
+                        }
+                    }
+                }
+                if (TheBegin == Type3.絕對)
+                {
+                    if (GetComponent<Image>() != null)
+                    {
+                        GetComponent<Image>().color = begin_col;
+                        if (!Stopin)
+                            tween[2] = Sequence.Insert(0.01f, GetComponent<Image>().DOColor(Now_col, time + rand_time));
+                    }
+                    else if (GetComponent<Text>() != null)
+                    {
+                        GetComponent<Text>().color = begin_col;
+                        if (!Stopin)
+                            tween[2] = Sequence.Insert(0.01f, GetComponent<Text>().DOColor(Now_col, time + rand_time));
+                    }
+                    else if (GetComponentsInChildren<Transform>(true).Length > 1)//有子物件
+                    {
+                        if (transform.GetChild(0).GetComponent<Image>() != null)
+                        {
+                            transform.GetChild(0).GetComponent<Image>().color = begin_col;
+                            if (!Stopin)
+                                tween[2] = Sequence.Insert(0.01f, transform.GetChild(0).GetComponent<Image>().DOColor(Now_col, time + rand_time));
+                        }
+                        else if (transform.GetChild(0).GetComponent<Text>() != null)
+                        {
+                            transform.GetChild(0).GetComponent<Text>().color = begin_col;
+                            if (!Stopin)
+                                tween[2] = Sequence.Insert(0.01f, transform.GetChild(0).GetComponent<Text>().DOColor(Now_col, time + rand_time));
+                        }
+                    }
+                }
             }
-            if (TheAnime == Type.Y軸彈跳)
+            if (TheAnime == Type.縮放)
             {
-                transform.localScale = new Vector3(transform.localScale.x, 0, transform.localScale.z);
-                tween[2] = Sequence.Insert(0.01f, transform.DOScale(Now_sca, time));
+                if (TheBegin == Type3.相對)
+                {
+                    if (!relatively)
+                        transform.localScale = transform.localScale + begin_sca;
+                    if (!Stopin)
+                        tween[2] = Sequence.Insert(0.01f, transform.DOScale(Now_sca, time + rand_time));
+                }
+                if (TheBegin == Type3.絕對)
+                {
+                    transform.localScale = begin_sca;
+                    if (!Stopin)
+                        tween[2] = Sequence.Insert(0.01f, transform.DOScale(Now_sca, time + rand_time));
+                }
             }
             if (TheAnime == Type.位移)
             {
-                if (GetComponent<RectTransform>() != null)
+                if (TheBegin == Type3.相對)
                 {
-                    GetComponent<RectTransform>().anchoredPosition = begin_pos;
-                    tween[2] = Sequence.Insert(0.01f, GetComponent<RectTransform>().DOMove(Now_pos, time));
+                    if (GetComponent<RectTransform>() != null)
+                    {
+                        if (!relatively)
+                            GetComponent<RectTransform>().anchoredPosition = GetComponent<RectTransform>().anchoredPosition + new Vector2(begin_pos.x , begin_pos.y);
+                        if (!Stopin)
+                            tween[2] = Sequence.Insert(0.01f, GetComponent<RectTransform>().DOMove(Now_pos, time + rand_time));
+                    }
+                    else
+                    {
+                        if (!relatively)
+                            transform.position = transform.position + begin_pos;
+                        if (!Stopin)
+                            tween[2] = Sequence.Insert(0.01f, transform.DOMove(Now_pos, time + rand_time));
+                    }
                 }
-                else
+                if (TheBegin == Type3.絕對)
                 {
-                    transform.position = begin_pos;
-                    tween[2] = Sequence.Insert(0.01f, transform.DOMove(Now_pos, time));
+                    if (GetComponent<RectTransform>() != null)
+                    {
+                        GetComponent<RectTransform>().anchoredPosition = begin_pos;
+                        if (!Stopin)
+                            tween[2] = Sequence.Insert(0.01f, GetComponent<RectTransform>().DOMove(Now_pos, time + rand_time));
+                    }
+                    else
+                    {
+                        transform.position = begin_pos;
+                        if (!Stopin)
+                            tween[2] = Sequence.Insert(0.01f, transform.DOMove(Now_pos, time + rand_time));
+                    }
                 }
+
             }
             if (TheAnime == Type.旋轉)
             {
-                transform.DORotate(new Vector3(transform.eulerAngles.x, transform.eulerAngles.y, begin_rot), 0);
-                tween[2] = Sequence.Insert(0.01f, transform.DORotate(new Vector3(transform.eulerAngles.x, transform.eulerAngles.y, Now_rot), time));
+                if (TheBegin == Type3.相對)
+                {
+                    if (!relatively)
+                        transform.DORotate(transform.eulerAngles + begin_rot, 0);
+                    if (!Stopin)
+                        tween[2] = Sequence.Insert(0.01f, transform.DORotate(begin_rot, time + rand_time));
+                }
+                if (TheBegin == Type3.絕對)
+                {
+                    transform.DORotate(begin_rot, 0);
+                    if (!Stopin)
+                        tween[2] = Sequence.Insert(0.01f, transform.DORotate(begin_rot, time + rand_time));
+                }
             }
         }
         else//淡出
         {
-            if (TheAnime == Type.彈跳)
+            if (TheAnime == Type.文字)
             {
-                tween[1] = Sequence.Insert(0f, transform.DOScale(new Vector3(0, 0, 0), time));
+                if (GetComponent<Text>() != null)
+                {
+                    if (!Stopin)
+                        tween[1] = Sequence.Insert(0f, GetComponent<Text>().DOText("", time + rand_time));
+                }
+                else if (GetComponentsInChildren<Transform>(true).Length > 1)//有子物件
+                {
+                    if (transform.GetChild(0).GetComponent<Text>() != null)
+                    {
+                        if (!Stopin)
+                            tween[1] = Sequence.Insert(0f, transform.GetChild(0).GetComponent<Text>().DOText("", time + rand_time));
+                    }
+                }
             }
-            if (TheAnime == Type.X軸彈跳)
+            if (TheAnime == Type.變色)
             {
-                tween[1] = Sequence.Insert(0f, transform.DOScale(new Vector3(0, transform.localScale.y, transform.localScale.z), time));
+                if (TheBegin == Type3.相對)
+                {
+                    if (GetComponent<Image>() != null)
+                    {
+                        if (!Stopin)
+                            tween[1] = Sequence.Insert(0f, GetComponent<Image>().DOColor(GetComponent<Image>().color - begin_col, time + rand_time));
+                    }
+                    else if (GetComponent<Text>() != null)
+                    {
+                        if (!Stopin)
+                            tween[1] = Sequence.Insert(0f, GetComponent<Text>().DOColor(GetComponent<Text>().color - begin_col, time + rand_time));
+                    }
+                    else if (GetComponentsInChildren<Transform>(true).Length > 1)//有子物件
+                    {
+                        if (transform.GetChild(0).GetComponent<Image>() != null)
+                        {
+                            if (!Stopin)
+                                tween[1] = Sequence.Insert(0f, transform.GetChild(0).GetComponent<Image>().DOColor(transform.GetChild(0).GetComponent<Image>().color - begin_col, time + rand_time));
+                        }
+                        else if (transform.GetChild(0).GetComponent<Text>() != null)
+                        {
+                            if (!Stopin)
+                                tween[1] = Sequence.Insert(0f, transform.GetChild(0).GetComponent<Text>().DOColor(transform.GetChild(0).GetComponent<Text>().color - begin_col, time + rand_time));
+                        }
+                    }
+                }
+                if (TheBegin == Type3.絕對)
+                {
+                    if (GetComponent<Image>() != null)
+                    {
+                        if (!Stopin)
+                            tween[1] = Sequence.Insert(0f, GetComponent<Image>().DOColor(begin_col, time + rand_time));
+                    }
+                    else if (GetComponent<Text>() != null)
+                    {
+                        if (!Stopin)
+                            tween[1] = Sequence.Insert(0f, GetComponent<Text>().DOColor(begin_col, time + rand_time));
+                    }
+                    else if (GetComponentsInChildren<Transform>(true).Length > 1)//有子物件
+                    {
+                        if (transform.GetChild(0).GetComponent<Image>() != null)
+                        {
+                            if (!Stopin)
+                                tween[1] = Sequence.Insert(0f, transform.GetChild(0).GetComponent<Image>().DOColor(begin_col, time + rand_time));
+                        }
+                        else if (transform.GetChild(0).GetComponent<Text>() != null)
+                        {
+                            if (!Stopin)
+                                tween[1] = Sequence.Insert(0f, transform.GetChild(0).GetComponent<Text>().DOColor(begin_col, time + rand_time));
+                        }
+                    }
+                }
             }
-            if (TheAnime == Type.Y軸彈跳)
+            if (TheAnime == Type.縮放)
             {
-                tween[1] = Sequence.Insert(0f, transform.DOScale(new Vector3(transform.localScale.y, 0, transform.localScale.z), time));
+                if (TheBegin == Type3.相對)
+                {
+                    if (!Stopin)
+                        tween[1] = Sequence.Insert(0f, transform.DOScale(transform.localScale - begin_sca, time + rand_time));
+                }
+                if (TheBegin == Type3.絕對)
+                {
+                    if (!Stopin)
+                        tween[1] = Sequence.Insert(0f, transform.DOScale(begin_sca, time + rand_time));
+                }
             }
             if (TheAnime == Type.位移)
             {
-                if (GetComponent<RectTransform>() != null)
+                if (TheBegin == Type3.相對)
                 {
-                    tween[1] = Sequence.Insert(0f, GetComponent<RectTransform>().DOMove(begin_pos, time));
+                    if (GetComponent<RectTransform>() != null)
+                    {
+                        if (!Stopin)
+                            tween[1] = Sequence.Insert(0f, GetComponent<RectTransform>().DOMove(GetComponent<RectTransform>().anchoredPosition - new Vector2(begin_pos.x, begin_pos.y), time + rand_time));
+                    }
+                    else
+                    {
+                        if (!Stopin)
+                            tween[1] = Sequence.Insert(0f, transform.DOMove(transform.position - begin_pos, time + rand_time));
+                    }
                 }
-                else
+                if (TheBegin == Type3.絕對)
                 {
-                    tween[1] = Sequence.Insert(0f, transform.DOMove(begin_pos, time));
+                    if (GetComponent<RectTransform>() != null)
+                    {
+                        if (!Stopin)
+                            tween[1] = Sequence.Insert(0f, GetComponent<RectTransform>().DOMove(begin_pos, time + rand_time));
+                    }
+                    else
+                    {
+                        if (!Stopin)
+                            tween[1] = Sequence.Insert(0f, transform.DOMove(begin_pos, time + rand_time));
+                    }
                 }
             }
             if (TheAnime == Type.旋轉)
             {
-                tween[1] = Sequence.Insert(0f, transform.DORotate(new Vector3(transform.eulerAngles.x, transform.eulerAngles.y, begin_rot), time));
+                if (TheBegin == Type3.相對)
+                {
+                    if (!Stopin)
+                        tween[1] = Sequence.Insert(0f, transform.DORotate(transform.eulerAngles - begin_rot, time + rand_time));
+                }
+                if (TheBegin == Type3.絕對)
+                {
+                    if (!Stopin)
+                        tween[1] = Sequence.Insert(0f, transform.DORotate(begin_rot, time + rand_time));
+                } 
             }
             Invoke("BackEnd", time);
         }
@@ -184,11 +488,19 @@ public class InOut : MonoBehaviour
             tween[1].SetEase(Ease.InOutBounce);
             tween[2].SetEase(Ease.InOutBounce);
         }
+
+        back = false;
     }
     public void Back()//收回
     {
         back = true;
-        Anime();
+        Run_Anime();
+    }
+    public void NowBack()//馬上收回
+    {
+        back = true;
+        delay_time = 0f;
+        Run_Anime();
     }
     void BackEnd()//收回結束
     {

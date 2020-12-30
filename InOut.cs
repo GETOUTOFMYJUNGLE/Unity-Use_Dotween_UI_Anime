@@ -108,7 +108,7 @@ public class InOut : MonoBehaviour
     Vector3 Now_rot;//目前角度
     bool back = false;//是要收回嗎
     bool relatively = false;//用來讓相對模式不會重複動到起始兩次的按鈕
-    void Start()
+    void Awake()
     {
         //定義目前狀態區
         Now_sca = transform.localScale;
@@ -139,9 +139,40 @@ public class InOut : MonoBehaviour
             if (transform.GetChild(0).GetComponent<Text>() != null)
                 Now_tex = transform.GetChild(0).GetComponent<Text>().text;
         }
-
+    }
+    void OnEnable()//當他被打開時觸發
+    {
         if (Startin)
         {
+            //定義目前狀態區
+            transform.localScale = Now_sca;
+            transform.position = Now_pos;
+            transform.eulerAngles = Now_rot;
+            if (GetComponent<Image>() != null)
+            {
+                GetComponent<Image>().color = Now_col;
+            }
+            else if (GetComponent<Text>() != null)
+            {
+                GetComponent<Text>().color = Now_col;
+            }
+            else if (GetComponentsInChildren<Transform>(true).Length > 1)//有子物件
+            {
+                if (transform.GetChild(0).GetComponent<Image>() != null)
+                    transform.GetChild(0).GetComponent<Image>().color = Now_col;
+                else if (transform.GetChild(0).GetComponent<Text>() != null)
+                    transform.GetChild(0).GetComponent<Text>().color = Now_col;
+            }
+            if (GetComponent<Text>() != null)
+            {
+                GetComponent<Text>().text = Now_tex;
+            }
+            else if (GetComponentsInChildren<Transform>(true).Length > 1)//有子物件
+            {
+                if (transform.GetChild(0).GetComponent<Text>() != null)
+                    transform.GetChild(0).GetComponent<Text>().text = Now_tex;
+            }
+
             Run_Anime();
         }
     }
@@ -164,7 +195,7 @@ public class InOut : MonoBehaviour
         {
             Anime();
         }
-        Invoke("BackInClose", delay_time + 0.3f);
+        Invoke("BackInClose", delay_time + 0.2f);
     }
     void Anime()
     {
@@ -536,5 +567,6 @@ public class InOut : MonoBehaviour
     void BackInClose()//把BackIn關掉
     {
         Backin = false;
+
     }
 }

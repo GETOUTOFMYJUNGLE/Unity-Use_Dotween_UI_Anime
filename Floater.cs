@@ -78,7 +78,8 @@ public class Floater : MonoBehaviour
     Vector3 Now_pos;//目前位置
     Vector3 Now_rot;//目前角度
     Color Now_col;//目前色彩
-    void Start()
+    public bool Wait_InOut_Randtime = false;//等待InOut呼叫
+    void Awake()
     {
         Now_sca = transform.localScale;
         Now_pos = transform.position;
@@ -105,16 +106,21 @@ public class Floater : MonoBehaviour
         {
             end_pos = new Vector3(end_pos.x + Screen.width / 2, end_pos.y + Screen.height / 2, end_pos.z);
         }
-        
+
         //如果你有InOut就要避免衝突
-        if (GetComponent<InOut>() != null)
+        if (GetComponent<InOut>() != null && GetComponent<InOut>().The_rand_time == 0)
         {
             Invoke("Anime", GetComponent<InOut>().time + GetComponent<InOut>().delay_time);
+        }
+        else if (GetComponent<InOut>() != null)
+        {
+            Wait_InOut_Randtime = true;
+            //既然InOut有隨機時間就讓他結束後再來呼喚Floater
         }
         else//沒有就直接開始
             Anime();
     }
-    void Anime()
+    public void Anime()
     {
         float rand_time = Random.Range(The_rand_time * -1, The_rand_time);
         if (rand_time + time < 0.1f)

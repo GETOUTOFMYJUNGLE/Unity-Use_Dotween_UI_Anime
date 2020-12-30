@@ -207,6 +207,13 @@ public class InOut : MonoBehaviour
         if (rand_time + time < 0.1f)
             rand_time = (time - 0.1f) * -1;
 
+        //如果有用隨機時間，且同物件有Floater，就由你呼叫
+        if (The_rand_time > 0 && GetComponent<Floater>() != null)
+        {
+            Invoke("CallFloater", time + rand_time);
+        }
+
+
         Sequence Sequence = DOTween.Sequence();//動畫列表
         Tween[] tween = new Tween[3];
         if (!back)//淡入
@@ -568,5 +575,10 @@ public class InOut : MonoBehaviour
     {
         Backin = false;
 
+    }
+    void CallFloater()//如果有用隨機時間，且同物件有Floater，就由你呼叫
+    {
+        if (GetComponent<Floater>().Wait_InOut_Randtime)//只一次
+            GetComponent<Floater>().Anime();
     }
 }

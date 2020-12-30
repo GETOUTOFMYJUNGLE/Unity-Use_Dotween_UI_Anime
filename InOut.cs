@@ -89,8 +89,12 @@ public class InOut : MonoBehaviour
     [Tooltip("決定是否停在起始位置")]
     public bool Stopin = false;
 
+    [Header("預設倒帶嗎")]
+    [Tooltip("決定是否初次啟用改成收回動畫")]
+    public bool Backin = false;
+
     [Header("預設啟用嗎")]
-    [Tooltip("決定是否一開始就要播放動畫")]
+    [Tooltip("決定是否一開始就要播放動畫，如果啟用收回後就會把物件關閉")]
     public bool Startin = true;
 
     //XXX為掛載此腳本的物件名稱
@@ -106,6 +110,7 @@ public class InOut : MonoBehaviour
     bool relatively = false;//用來讓相對模式不會重複動到起始兩次的按鈕
     void Start()
     {
+        //定義目前狀態區
         Now_sca = transform.localScale;
         Now_pos = transform.position;
         Now_rot = transform.eulerAngles;
@@ -124,7 +129,7 @@ public class InOut : MonoBehaviour
             else if (transform.GetChild(0).GetComponent<Text>() != null)
                 Now_col = transform.GetChild(0).GetComponent<Text>().color;
         }
-        
+
         if (GetComponent<Text>() != null)
         {
             Now_tex = GetComponent<Text>().text;
@@ -134,32 +139,39 @@ public class InOut : MonoBehaviour
             if (transform.GetChild(0).GetComponent<Text>() != null)
                 Now_tex = transform.GetChild(0).GetComponent<Text>().text;
         }
-        Run_Anime();
+
+        if (Startin)
+        {
+            Run_Anime();
+        }
     }
     public void Run_Anime()
     {
         relatively = false;
-        if (Startin)
+        if (delay_time > 0 && !Stopin)//執行動畫
         {
-            //執行動畫
-            if (delay_time > 0 && !Stopin)
-            {
-                Stopin = true;
-                Anime();
-                Stopin = false;
-                relatively = true;
-                Invoke("Anime", delay_time);
-            }
-            else if (delay_time > 0 && Stopin)
-            {
-                Invoke("Anime", delay_time);
-            }
-            else
-                Anime();
+            Stopin = true;
+            Anime();
+            Stopin = false;
+            relatively = true;
+            Invoke("Anime", delay_time);
         }
+        else if (delay_time > 0 && Stopin)
+        {
+            Invoke("Anime", delay_time);
+        }
+        else
+        {
+            Anime();
+        }
+        Invoke("BackInClose", delay_time + 0.3f);
     }
     void Anime()
     {
+        if (Backin)//如果預設倒帶
+        {
+            back = true;
+        }
         float rand_time = Random.Range(The_rand_time * -1, The_rand_time);//隨機時間
         if (rand_time + time < 0.1f)
             rand_time = (time - 0.1f) * -1;
@@ -489,7 +501,15 @@ public class InOut : MonoBehaviour
             tween[2].SetEase(Ease.InOutBounce);
         }
 
-        back = false;
+        if (back && Startin && !Backin)//預設啟用且返回且沒在倒帶就關閉
+        {
+            gameObject.SetActive(false);
+        }
+        if (!Backin)
+        {
+            back = false;
+        }
+
     }
     public void Back()//收回
     {
@@ -512,5 +532,9 @@ public class InOut : MonoBehaviour
         {
             back = false;
         }
+    }
+    void BackInClose()//把BackIn關掉
+    {
+        Backin = false;
     }
 }

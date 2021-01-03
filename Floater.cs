@@ -201,12 +201,12 @@ public class Floater : MonoBehaviour
             if (TheBegin == Type3.相對)
             {
                 tween[1] = Sequence.Insert(0f, transform.DOScale(Now_sca + end_sca, time + rand_time));
-                tween[2] = Sequence.Insert(time + rand_time, transform.DOMove(Now_sca, time + rand_time));
+                tween[2] = Sequence.Insert(time + rand_time, transform.DOScale(Now_sca, time + rand_time));
             }
             if (TheBegin == Type3.絕對)
             {
                 tween[1] = Sequence.Insert(0f, transform.DOScale(end_sca, time + rand_time));
-                tween[2] = Sequence.Insert(time + rand_time, transform.DOMove(Now_sca, time + rand_time));
+                tween[2] = Sequence.Insert(time + rand_time, transform.DOScale(Now_sca, time + rand_time));
             }
         }
         if (TheAnime == Type.旋轉)

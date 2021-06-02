@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
@@ -34,6 +34,8 @@ public class Floater : MonoBehaviour
         位移,
         縮放,
         旋轉,
+        文字,
+        震動,
     }
     [Header("動畫模式")]
     [Tooltip("決定這物體的動畫行為")]
@@ -53,7 +55,7 @@ public class Floater : MonoBehaviour
     public Color end_col;
 
     [Header("終點位置")]
-    [Tooltip("如果動畫模式是位移的話，那最終要在哪裡")]
+    [Tooltip("如果動畫模式是位移或震動的話，那最終要在哪裡")]
     public Vector3 end_pos;
 
     [Header("終點角度")]
@@ -74,16 +76,34 @@ public class Floater : MonoBehaviour
     [Range(0f, 30f)]
     public float The_rand_time = 0f;
 
+    [Header("啟用延遲時間")]
+    [Tooltip("可以讓出現的動畫延遲幾秒後再執行")]
+    [Range(0f, 60f)]
+    public float delay_time = 0f;
+
+    [Header("收回曲線顛倒嗎")]
+    [Tooltip("決定是讓收回的曲線模式相反過來")]
+    public bool SameOut = true;
+
     Vector3 Now_sca;//目前大小
     Vector3 Now_pos;//目前位置
     Vector3 Now_rot;//目前角度
     Color Now_col;//目前色彩
+    string Now_str;//目前文字
+
+    [HideInInspector]
     public bool Wait_InOut_Randtime = false;//等待InOut呼叫
     void Awake()
     {
         Now_sca = transform.localScale;
         Now_pos = transform.position;
         Now_rot = transform.eulerAngles;
+        if (GetComponent<Text>() != null)
+        {
+            Now_str = GetComponent<Text>().text;
+            if (TheAnime == Type.文字)
+                GetComponent<Text>().text = "";
+        }
         if (GetComponent<Image>() != null)
         {
             Now_col = GetComponent<Image>().color;
@@ -108,26 +128,28 @@ public class Floater : MonoBehaviour
         }
 
         //如果你有InOut就要避免衝突
-        if (GetComponent<InOut>() != null && GetComponent<InOut>().The_rand_time == 0)
+        if (GetComponent<InOut>() != null && GetComponent<InOut>().The_rand_time == 0 && GetComponent<InOut>().FloaterWait)
         {
             Invoke("Anime", GetComponent<InOut>().time + GetComponent<InOut>().delay_time);
         }
-        else if (GetComponent<InOut>() != null)
+        else if (GetComponent<InOut>() != null && GetComponent<InOut>().FloaterWait)
         {
             Wait_InOut_Randtime = true;
             //既然InOut有隨機時間就讓他結束後再來呼喚Floater
         }
+        else if (delay_time > 0)
+            Invoke("Anime", delay_time);
         else//沒有就直接開始
             Anime();
     }
     public void Anime()
     {
+        Tween[] tween = new Tween[3];
         float rand_time = Random.Range(The_rand_time * -1, The_rand_time);
         if (rand_time + time < 0.1f)
             rand_time = (time - 0.1f) * -1;
 
         Sequence Sequence = DOTween.Sequence();//動畫列表
-        Tween[] tween = new Tween[3];
         if (TheAnime == Type.變色)
         {
             if (TheBegin == Type3.相對)
@@ -222,42 +244,103 @@ public class Floater : MonoBehaviour
                 tween[2] = Sequence.Insert(time + rand_time, transform.DORotate(Now_rot, time + rand_time));
             }
         }
+        if (TheAnime == Type.文字)
+        {
+            tween[1] = Sequence.Insert(0, GetComponent<Text>().DOText(Now_str, time + rand_time));
+            tween[2] = Sequence.Insert(time + rand_time, GetComponent<Text>().DOText("     ", (time + rand_time) / 3));
+        }
+        if (TheAnime == Type.震動)
+        {
+            if (TheBegin == Type3.相對)
+            {
+                tween[1] = Sequence.Insert(0f, transform.DOMove(Now_pos + new Vector3(Random.Range(end_pos.x * -1 , end_pos.x), Random.Range(end_pos.y * -1, end_pos.y), Random.Range(end_pos.z * -1, end_pos.z)), time + rand_time));
+                tween[2] = Sequence.Insert(time + rand_time, transform.DOMove(Now_pos + new Vector3(Random.Range(end_pos.x * -1, end_pos.x), Random.Range(end_pos.y * -1, end_pos.y), Random.Range(end_pos.z * -1, end_pos.z)), time + rand_time));
+            }
+            if (TheBegin == Type3.絕對)
+            {
+                tween[1] = Sequence.Insert(0f, transform.DOMove(new Vector3(Random.Range(end_pos.x * -1, end_pos.x), Random.Range(end_pos.y * -1, end_pos.y), Random.Range(end_pos.z * -1, end_pos.z)), time + rand_time));
+                tween[2] = Sequence.Insert(time + rand_time, transform.DOMove(new Vector3(Random.Range(end_pos.x * -1, end_pos.x), Random.Range(end_pos.y * -1, end_pos.y), Random.Range(end_pos.z * -1, end_pos.z)), time + rand_time));
+            }
+        }
 
-        if (TheEase == Type2.由快到慢)
+
+        if (SameOut)
         {
-            tween[1].SetEase(Ease.OutCirc);
-            tween[2].SetEase(Ease.InCirc);
+            if (TheEase == Type2.由快到慢)
+            {
+                tween[1].SetEase(Ease.OutCirc);
+                tween[2].SetEase(Ease.InCirc);
+            }
+            if (TheEase == Type2.由慢到快)
+            {
+                tween[1].SetEase(Ease.InCirc);
+                tween[2].SetEase(Ease.OutCirc);
+            }
+            if (TheEase == Type2.由快跳到慢跳)
+            {
+                tween[1].SetEase(Ease.OutBounce);
+                tween[2].SetEase(Ease.InBounce);
+            }
+            if (TheEase == Type2.由慢跳到快跳)
+            {
+                tween[1].SetEase(Ease.InBounce);
+                tween[2].SetEase(Ease.OutBounce);
+            }
+            if (TheEase == Type2.由慢震到快震)
+            {
+                tween[1].SetEase(Ease.OutElastic);
+                tween[2].SetEase(Ease.InElastic);
+            }
+            if (TheEase == Type2.由快震到慢震)
+            {
+                tween[1].SetEase(Ease.InElastic);
+                tween[2].SetEase(Ease.OutElastic);
+            }
+            if (TheEase == Type2.亂跳)
+            {
+                tween[1].SetEase(Ease.InOutBounce);
+                tween[2].SetEase(Ease.InOutBounce);
+            }
         }
-        if (TheEase == Type2.由慢到快)
+        else
         {
-            tween[1].SetEase(Ease.InCirc);
-            tween[2].SetEase(Ease.OutCirc);
+            if (TheEase == Type2.由快到慢)
+            {
+                tween[1].SetEase(Ease.OutCirc);
+                tween[2].SetEase(Ease.OutCirc);
+            }
+            if (TheEase == Type2.由慢到快)
+            {
+                tween[1].SetEase(Ease.InCirc);
+                tween[2].SetEase(Ease.InCirc);
+            }
+            if (TheEase == Type2.由快跳到慢跳)
+            {
+                tween[1].SetEase(Ease.OutBounce);
+                tween[2].SetEase(Ease.OutBounce);
+            }
+            if (TheEase == Type2.由慢跳到快跳)
+            {
+                tween[1].SetEase(Ease.InBounce);
+                tween[2].SetEase(Ease.InBounce);
+            }
+            if (TheEase == Type2.由慢震到快震)
+            {
+                tween[1].SetEase(Ease.OutElastic);
+                tween[2].SetEase(Ease.OutElastic);
+            }
+            if (TheEase == Type2.由快震到慢震)
+            {
+                tween[1].SetEase(Ease.InElastic);
+                tween[2].SetEase(Ease.InElastic);
+            }
+            if (TheEase == Type2.亂跳)
+            {
+                tween[1].SetEase(Ease.InOutBounce);
+                tween[2].SetEase(Ease.InOutBounce);
+            }
         }
-        if (TheEase == Type2.由快跳到慢跳)
-        {
-            tween[1].SetEase(Ease.OutBounce);
-            tween[2].SetEase(Ease.InBounce);
-        }
-        if (TheEase == Type2.由慢跳到快跳)
-        {
-            tween[1].SetEase(Ease.InBounce);
-            tween[2].SetEase(Ease.OutBounce);
-        }
-        if (TheEase == Type2.由慢震到快震)
-        {
-            tween[1].SetEase(Ease.OutElastic);
-            tween[2].SetEase(Ease.InElastic);
-        }
-        if (TheEase == Type2.由快震到慢震)
-        {
-            tween[1].SetEase(Ease.InElastic);
-            tween[2].SetEase(Ease.OutElastic);
-        }
-        if (TheEase == Type2.亂跳)
-        {
-            tween[1].SetEase(Ease.InOutBounce);
-            tween[2].SetEase(Ease.InOutBounce);
-        }
+
 
         Invoke("Anime", (time + rand_time) * 2);
     }
